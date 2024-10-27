@@ -1,40 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Bell, Pencil, Heart } from 'lucide-react';
 import PetProfileForm from './PetProfileForm';
+import { petService } from '../services/petService';
 
-const PetProfile = () => {
+const PetProfile = ({ petId }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [pet, setPet] = useState({
-    name: 'Max',
-    type: 'Dog',
-    breed: 'Golden Retriever',
-    age: 3,
-    weight: '30kg',
-    nextFeeding: '18:00',
-    nextGrooming: '2024-11-01',
-    medicalInfo: {
-      allergies: ['Chicken'],
-      conditions: ['None'],
-      lastCheckup: '2024-09-15'
+  const [pet, setPet] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (petId) {
+      loadPet();
+    } else {
+      setLoading(false);
     }
-  });
+  }, [petId]);
+
+  const loadPet = async () => {
+    try {
+      const data = await petService.getPetById(petId);
+      setPet(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load pet data');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
   };
 
-  const handleUpdate = (updatedPet) => {
-    setPet(updatedPet);
-    setIsEditing(false);
+  const handleUpdate = async (updatedPetData) => {
+    try {
+      setLoading(true);
+      if (pet?._id) {
+        const updatedPet = await petService.updatePet(pet._id, updatedPetData);
+        setPet(updatedPet);
+      } else {
+        const newPet = await petService.createPet(updatedPetData);
+        setPet(newPet);
+      }
+      setIsEditing(false);
+      setError(null);
+    } catch (err) {
+      setError('Failed to save pet data');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
   };
 
-  if (isEditing) {
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
+
+  if (isEditing || !pet) {
     return (
       <PetProfileForm
         existingPet={pet}
@@ -90,7 +132,7 @@ const PetProfile = () => {
               <div className="text-sm space-y-1">
                 <p>Allergies: {pet.medicalInfo.allergies.join(', ') || 'None'}</p>
                 <p>Conditions: {pet.medicalInfo.conditions.join(', ')}</p>
-                <p>Last Checkup: {pet.medicalInfo.lastCheckup}</p>
+                <p>Last Checkup: {new Date(pet.medicalInfo.lastCheckup).toLocaleDateString()}</p>
               </div>
             </div>
           </div>
